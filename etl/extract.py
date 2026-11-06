@@ -13,7 +13,7 @@ def extract_data(filepath: object, select_cols: list, rename_cols: dict) -> obje
         # Lire le CSV fichier
         df = pd.read_csv(filepath)
         df = df[select_cols]
-        df = df.rename(columns={rename_cols})
+        df = df.rename(columns=rename_cols)
 
     # Ce bloc capture l'erreur FileNotFoundError, qui se produit si le fichier spécifié par filepath
     #  n'est pas trouvé. L'erreur est assignée à la variable e et un message d'erreur est imprimé.

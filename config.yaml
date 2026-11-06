@@ -1,90 +1,177 @@
-# Fichier de Configuration principale 
-# Contenu du fichier de configuration du Pipeline
 
+# ============================================================
+# CONFIGURATION PRINCIPALE DU PIPELINE ETL
+# ============================================================
+
+# Informations générales sur le pipeline ETL.
 pipeline:
-  name: Mon premier Pipeline # Le nom du pipeline de données.
-  version: 1.0  # La version du pipeline de données.
+  name: "Mon premier Pipeline"
+  version: 1.0
 
-# Paramètres de Connexion à la Base de Données PostgreSQL docker
+
+# ============================================================
+# PARAMÈTRES DE CONNEXION À LA BASE DE DONNÉES POSTGRESQL
+# ============================================================
+
 postgresql:
-  host: localhost # localhost signifie que la base de données est hébergée sur la même machine
-  port: 5433 # 5433 est le port d'eposition par PostgreSQL docker.
-  username: postgres # Le Nom d'utilisateur administrateur par défaut pour PostgreSQL.
-  password: etl_password # Le Mot de passe de l'utilisateur pour se connecter à la BDD
-  database_name: etl_dw # Le Nom de la base de données à laquelle vous voulez vous connecter.
+  host: postgres          # Nom du service PostgreSQL dans Docker Compose.
+  port: 5432              # Port interne du conteneur PostgreSQL.
+  username: postgres      # Nom de l'utilisateur PostgreSQL.
+  password: etl_password  # Mot de passe de connexion.
+  database_name: etl_dw   # Nom de la base de données.
 
 
-# Chemin des base de données CSV
-customers_filepath: data/customers.csv
-orders_filepath: data/orders.csv
+# ============================================================
+# CHEMINS D'ACCÈS AUX FICHIERS CSV
+# ============================================================
+
+# Emplacement des fichiers sources contenant les données brutes.
+customers_filepath: "data/customers.csv"
+orders_filepath: "data/orders.csv"
 
 
-# Liste des Noms des Colonnes de la base de données 
-customers_columns_list: [ 'customer_id', 'first_name', 'last_name', 'email', 'city', 'signup_date']
+# ============================================================
+# LISTES DES COLONNES À EXTRAIRE
+# ============================================================
 
-orders_columns_list: ['order_id', 'customer_id', 'order_date', 'product', 'quantity', 'unit_price', 'status']
+# Colonnes à récupérer dans le fichier customers.csv.
+customers_columns_list:
+  - customer_id
+  - first_name
+  - last_name
+  - email
+  - city
+  - signup_date
+
+# Colonnes à récupérer dans le fichier orders.csv.
+orders_columns_list:
+  - order_id
+  - customer_id
+  - order_date
+  - product
+  - quantity
+  - unit_price
+  - status
 
 
-# Dictionnaire des Noms des Colonnes de la base de données modifiée
-customers_columns_rename_dict: {
-    "customer_id": "id_client",
-    "first_name": "prenom",
-    "last_name": "nom",
-    "email": "email",
-    "city": "ville",
-    "signup_date": "date_inscription"
-}
+# ============================================================
+# DICTIONNAIRES DE RENOMMAGE DES COLONNES
+# ============================================================
 
-orders_columns_rename_dict: {
-    "order_id": "id_commande",
-    "customer_id": "id_client",
-    "order_date": "date_commande",
-    "product": "produit",
-    "quantity": "quantite",
-    "unit_price": "prix_unitaire",
-    "status": "statut"
-}
-                              
-# Les Base de données sauvergardées dans la table PostgreSQL docker (PSQL)
+# Correspondance entre les noms des colonnes sources
+# et les noms retenus dans notre base de données.
+customers_columns_rename_dict:
+  customer_id: id_client
+  first_name: prenom
+  last_name: nom
+  email: email
+  city: ville
+  signup_date: date_inscription
 
-# Cette ligne spécifie le nom de la table PostgreSQL (PSQL) où 
-# les données seront stockées.
-# etl_dw.customers est le nom de la table PostgreSQL où 
+orders_columns_rename_dict:
+  order_id: id_commande
+  customer_id: id_client
+  order_date: date_commande
+  product: produit
+  quantity: quantite
+  unit_price: prix_unitaire
+  status: statut
 
-#  customers_table_PSQL : Spécifie la table PostgreSQL où les données des accidents de circulation seront stockées.
-#   Le préfixe customers_table_ indique clairement que cette clé est liée à la table des accidents.
 
-customers_table_PSQL: etl_dw.customers
-orders_table_PSQL: etl_dw.orders
+# ============================================================
+# NOMS DES TABLES POSTGRESQL
+# ============================================================
 
-  
-# Chicago Data output schemas in PSQL
-customers_create_PSQL: '''CREATE TABLE IF NOT EXISTS etl_dw.customers
-                      (id_client INTEGER PRIMARY KEY,
-                        prenom VARCHAR(100),
-                        nom VARCHAR(100),
-                        email VARCHAR(255),
-                        ville VARCHAR(100),
-                        date_inscription DATE)'''
-customers_insert_PSQL: 'INSERT INTO etl_dw.customers VALUES (%s, %s, %s, %s, %s, %s)'
+# Noms qualifiés des tables : schéma.table.
+customers_table_PSQL: "etl_dw.customers"
+orders_table_PSQL: "etl_dw.orders"
 
-# customers_insert_PSQL : Cette commande SQL est utilisée pour insérer des valeurs dans la table customers du schéma etl_dw.
-# Les symboles %s sont des espaces réservés (placeholders) pour les valeurs qui seront insérées dans 
-#chaque colonne.
- 
-orders_create_PSQL: '''CREATE TABLE IF NOT EXISTS etl_dw.orders
-                    (
-                        id_commande INTEGER PRIMARY KEY,
-                        id_client INTEGER,
-                        date_commande DATE,
-                        produit VARCHAR(150),
-                        quantite INTEGER,
-                        prix_unitaire NUMERIC(12, 2),
-                        status VARCHAR(50),
 
-                        CONSTRAINT fk_orders_customers
-                            FOREIGN KEY (id_client)
-                            REFERENCES etl_dw.customers(id_client)
-                    )'''
-orders_insert_PSQL: 'INSERT INTO etl_dw.orders VALUES (%s, %s, %s, %s, %s, %s, %s)'
+# ============================================================
+# COMMANDES SQL DE CRÉATION DU SCHÉMA ET DES TABLES
+# ============================================================
 
+# Création du schéma etl_dw s'il n'existe pas encore.
+schema_create_PSQL: |
+  CREATE SCHEMA IF NOT EXISTS etl_dw;
+
+
+# Création de la table des clients.
+# id_client est la clé primaire : chaque client doit avoir un identifiant unique.
+customers_create_PSQL: |
+  CREATE TABLE IF NOT EXISTS etl_dw.customers (
+    id_client INTEGER PRIMARY KEY,
+    prenom VARCHAR(100),
+    nom VARCHAR(100),
+    email VARCHAR(255),
+    ville VARCHAR(100),
+    date_inscription DATE
+  );
+
+
+# Création de la table des commandes.
+# id_commande est la clé primaire.
+# id_client est une clé étrangère qui référence la table customers.
+orders_create_PSQL: |
+  CREATE TABLE IF NOT EXISTS etl_dw.orders (
+    id_commande INTEGER PRIMARY KEY,
+    id_client INTEGER,
+    date_commande DATE,
+    produit VARCHAR(150),
+    quantite INTEGER,
+    prix_unitaire NUMERIC(12, 2),
+    statut VARCHAR(50),
+
+    CONSTRAINT fk_orders_customers
+      FOREIGN KEY (id_client)
+      REFERENCES etl_dw.customers(id_client)
+  );
+
+
+# ============================================================
+# COMMANDES SQL D'INSERTION ET DE MISE À JOUR DES DONNÉES
+# ============================================================
+
+# INSERTION DES CLIENTS
+#
+# ON CONFLICT (id_client) :
+# Si un client possède déjà cet identifiant, PostgreSQL ne génère
+# pas d'erreur de doublon.
+#
+# DO UPDATE :
+# Les informations du client existant sont actualisées avec
+# les nouvelles valeurs provenant du fichier CSV.
+
+customers_insert_PSQL: |
+  INSERT INTO etl_dw.customers
+  (id_client, prenom, nom, email, ville, date_inscription)
+  VALUES (%s, %s, %s, %s, %s, %s)
+  ON CONFLICT (id_client)
+  DO UPDATE SET
+    prenom = EXCLUDED.prenom,
+    nom = EXCLUDED.nom,
+    email = EXCLUDED.email,
+    ville = EXCLUDED.ville,
+    date_inscription = EXCLUDED.date_inscription;
+
+
+# INSERTION DES COMMANDES
+#
+# ON CONFLICT (id_commande) :
+# Si la commande existe déjà, PostgreSQL actualise ses informations.
+#
+# Cela permet de relancer le chargement sans provoquer une erreur
+# de clé primaire en cas de données déjà présentes.
+
+orders_insert_PSQL: |
+  INSERT INTO etl_dw.orders
+  (id_commande, id_client, date_commande, produit, quantite, prix_unitaire, statut)
+  VALUES (%s, %s, %s, %s, %s, %s, %s)
+  ON CONFLICT (id_commande)
+  DO UPDATE SET
+    id_client = EXCLUDED.id_client,
+    date_commande = EXCLUDED.date_commande,
+    produit = EXCLUDED.produit,
+    quantite = EXCLUDED.quantite,
+    prix_unitaire = EXCLUDED.prix_unitaire,
+    statut = EXCLUDED.statut;

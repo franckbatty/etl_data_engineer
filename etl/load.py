@@ -4,7 +4,6 @@
 # ============================================================
 
 import psycopg2
-import configparser
 import yaml
 from pathlib import Path
 
@@ -14,17 +13,11 @@ from pathlib import Path
   Il permet à Python de se connecter et d'interagir avec une
   base de données PostgreSQL.
 
-- Le module configparser permet de manipuler les fichiers de
-  configuration au format INI. Il facilite la séparation des
-  paramètres de configuration du code Python.
-
 - Le module yaml permet de lire et de manipuler les fichiers
-  au format YAML (YAML Ain't Markup Language). Il permet de
-  convertir les données YAML en structures Python.
-  
+  au format YAML.
+
 - Le module pathlib permet de manipuler les chemins d'accès
-  aux fichiers de manière fiable, quel que soit le répertoire
-  depuis lequel le programme est exécuté.
+  aux fichiers de manière fiable.
 '''
 
 
@@ -33,15 +26,12 @@ from pathlib import Path
 # ============================================================
 
 # Récupération du chemin absolu du dossier racine du projet.
-# __file__ représente le chemin du fichier load.py.
-# parents[1] remonte de etl/ vers le dossier racine du projet.
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 
 # Ouverture du fichier config.yaml en mode lecture.
 with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
 
     # Lecture du contenu YAML et conversion en dictionnaire Python.
-    # safe_load() permet de charger les données YAML de manière sécurisée.
     config_data = yaml.safe_load(file)
 
 
@@ -63,70 +53,100 @@ Retour :
 # FONCTION DE CHARGEMENT DES DONNÉES (LOAD)
 # ============================================================
 
-def load_data(df: object, create_PSQL: str, insert_PSQL: str) -> None:
+def load_data(df, create_PSQL: str, insert_PSQL: str) -> None:
 
     # --------------------------------------------------------
-    # 1. LECTURE DU FICHIER DE CONFIGURATION INI
+    # 1. RÉCUPÉRATION DES PARAMÈTRES DE CONNEXION
     # --------------------------------------------------------
 
-    # Création d'un objet ConfigParser pour lire le fichier INI.
-    config = configparser.ConfigParser()
-
-    # Définition du chemin absolu du fichier config.ini.
-    CONFIG_INI_PATH = Path(__file__).resolve().parents[1] / "config.ini"
-
-    # Lecture des paramètres de connexion PostgreSQL.
-    config.read(CONFIG_INI_PATH, encoding='utf-8')
+    # Récupération des paramètres PostgreSQL depuis config.yaml.
+    postgres_config = config_data['postgresql']
 
 
     # --------------------------------------------------------
     # 2. CONNEXION À LA BASE DE DONNÉES POSTGRESQL
     # --------------------------------------------------------
 
-    # psycopg2.connect() établit une connexion à PostgreSQL
-    # à partir des paramètres contenus dans config.ini.
-    conn = psycopg2.connect(
-        host=config['POSTGRESQL']['host'],
-        port=config['POSTGRESQL']['port'],
-        dbname=config['POSTGRESQL']['database'],
-        user=config['POSTGRESQL']['user'],
-        password=config['POSTGRESQL']['password']
-    )
+    conn = None
+    cursor = None
 
-    # --------------------------------------------------------
-    # 3. CRÉATION DU CURSEUR ET DE LA TABLE
-    # --------------------------------------------------------
+    try:
 
-    # Création d'un curseur pour exécuter les commandes SQL.
-    cursor = conn.cursor()
+        # Établissement de la connexion à PostgreSQL.
+        conn = psycopg2.connect(
+            host=postgres_config['host'],
+            port=postgres_config['port'],
+            dbname=postgres_config['database_name'],
+            user=postgres_config['username'],
+            password=postgres_config['password']
+        )
 
-    # Exécution de la commande SQL de création de la table.
-    cursor.execute(create_PSQL)
-
-    # Validation de la transaction de création de la table.
-    conn.commit()
+        # Création d'un curseur pour exécuter les commandes SQL.
+        cursor = conn.cursor()
 
 
-    # --------------------------------------------------------
-    # 4. INSERTION DES DONNÉES
-    # --------------------------------------------------------
+        # ----------------------------------------------------
+        # 3. CRÉATION DU SCHÉMA POSTGRESQL
+        # ----------------------------------------------------
 
-    # Parcours de chaque ligne du DataFrame sans récupérer l'index.
-    for row in df.itertuples(index=False):
-
-        # Insertion des valeurs de la ligne dans PostgreSQL.
-        cursor.execute(insert_PSQL, row)
+        # Création du schéma s'il n'existe pas encore.
+        cursor.execute(config_data['schema_create_PSQL'])
 
 
-    # --------------------------------------------------------
-    # 5. VALIDATION ET FERMETURE DES RESSOURCES
-    # --------------------------------------------------------
+        # ----------------------------------------------------
+        # 4. CRÉATION DE LA TABLE
+        # ----------------------------------------------------
 
-    # Validation de toutes les opérations d'insertion.
-    conn.commit()
+        # Exécution de la commande SQL de création de la table.
+        cursor.execute(create_PSQL)
 
-    # Fermeture du curseur.
-    cursor.close()
 
-    # Fermeture de la connexion à PostgreSQL.
-    conn.close()
+        # ----------------------------------------------------
+        # 5. INSERTION DES DONNÉES
+        # ----------------------------------------------------
+
+        # Parcours de chaque ligne du DataFrame sans récupérer l'index.
+        for row in df.itertuples(index=False, name=None):
+
+            # Insertion des valeurs dans PostgreSQL.
+            cursor.execute(insert_PSQL, row)
+
+
+        # ----------------------------------------------------
+        # 6. VALIDATION DE LA TRANSACTION
+        # ----------------------------------------------------
+
+        # Validation de la création du schéma, de la table
+        # et de l'insertion des données.
+        conn.commit()
+
+        print(
+            f"{len(df)} lignes chargées avec succès "
+            f"dans la table PostgreSQL."
+        )
+
+
+    except Exception as e:
+
+        # Annulation de toutes les opérations en cas d'erreur.
+        if conn is not None:
+            conn.rollback()
+
+        raise RuntimeError(
+            f"Erreur lors du chargement des données : {e}"
+        ) from e
+
+
+    finally:
+
+        # ----------------------------------------------------
+        # 7. FERMETURE DES RESSOURCES
+        # ----------------------------------------------------
+
+        # Fermeture du curseur.
+        if cursor is not None:
+            cursor.close()
+
+        # Fermeture de la connexion PostgreSQL.
+        if conn is not None:
+            conn.close()

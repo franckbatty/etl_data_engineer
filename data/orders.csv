@@ -1,6 +1,7 @@
+
 order_id,customer_id,order_date,product,quantity,unit_price,status
 1001,1,2025-07-01,Laptop,1,450000,completed
-1002,2,2025-07-02,Mouse,2,7500,Completed
+1002,2,2025-07-02,Mouse,2,7500,completed
 1003,3,2025-07-02,Keyboard,1,12000,pending
 1004,1,2025-07-05,Monitor,2,95000,completed
 1005,4,2025-07-06,USB cable,3,2500,cancelled
@@ -14,8 +15,3 @@ order_id,customer_id,order_date,product,quantity,unit_price,status
 1013,4,2025-07-19,USB cable,5,2500,completed
 1014,6,2025-07-20,Laptop,1,450000,pending
 1015,8,2025-07-21,Monitor,1,95000,completed
-1015,8,2025-07-21,Monitor,1,95000, completed 
-1016,999,2025-07-22,USB cable,2,2500,completed
-1017,7,2025-07-23,Webcam,1,22000,unknown
-1018,1,2025-07-24,Mouse,0,7500,completed
-1019,2,2025-07-25,Keyboard,1,,completed

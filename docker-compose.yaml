@@ -1,104 +1,93 @@
-# Fichier de configuration Docker Compose permettant de définir,
-# configurer et orchestrer les services PostgreSQL et Apache Airflow.
 
 services:
 
-  # 1. Base de données PostgreSQL
+  # ==========================================================
+  # 1. SERVICE POSTGRESQL
+  # ==========================================================
+
   postgres:
     image: postgres:15
     container_name: etl_postgres
-    restart: always
 
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-etl_password}"
+      POSTGRES_DB: "${POSTGRES_DB:-etl_dw}"
 
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5433:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # 2. Initialisation de la base de métadonnées Airflow
-  airflow-init:
-    build: .
-    container_name: airflow_init
-    restart: "no"
+  # ==========================================================
+  # 2. SERVICE AIRFLOW
+  # ==========================================================
+
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: etl-airflow:2.9.2
+    container_name: etl_airflow
 
     depends_on:
       postgres:
         condition: service_healthy
 
-    environment: &airflow_environment
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+    environment:
 
-    volumes: &airflow_volumes
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./src:/opt/airflow/src
-      - ./data:/opt/airflow/data
-      - ./config.ini:/opt/airflow/config.ini
-      - ./config.yaml:/opt/airflow/config.yaml
+      # Configuration Airflow
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/state/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
 
-    command: >
-      bash -c "airflow db migrate &&
-      (airflow users list | grep -q admin ||
-      airflow users create
-      --username admin
-      --password admin
-      --firstname Admin
-      --lastname User
-      --role Admin
-      --email admin@example.com)"
+      # Clés de sécurité
+      AIRFLOW__CORE__FERNET_KEY: "jp20nflyKfPl-Q7Ucf2uucV6zs54UPRFN2iZICELgcQ="
+      AIRFLOW__WEBSERVER__SECRET_KEY: "UaSk8XWJyv-wcnKz8u0Pja64_zz4pRQJKWs_n2v58ME"
 
-  # 3. Serveur Web Airflow
-  airflow-webserver:
-    build: .
-    container_name: airflow_webserver
-    restart: always
+      # Chemin des modules Python
+      PYTHONPATH: /opt/airflow
 
-    depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+      # Répertoire des fichiers CSV
+      ETL_DATA_DIR: /opt/airflow/data
 
-    environment: *airflow_environment
-
-    volumes: *airflow_volumes
+      # Connexion PostgreSQL pour l'ETL
+      ETL_DB_HOST: postgres
+      ETL_DB_PORT: "5432"
+      ETL_DB_NAME: "${POSTGRES_DB:-etl_dw}"
+      ETL_DB_USER: "${POSTGRES_USER:-postgres}"
+      ETL_DB_PASSWORD: "${POSTGRES_PASSWORD:-etl_password}"
 
     ports:
       - "8080:8080"
 
-    command: webserver
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./etl:/opt/airflow/etl
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - ./config.ini:/opt/airflow/config.ini
+      - ./config.yaml:/opt/airflow/config.yaml
+      - ./airflow_state:/backup:ro
+      - airflow_state_data:/opt/airflow/state
 
-  # 4. Ordonnanceur Airflow
-  airflow-scheduler:
-    build: .
-    container_name: airflow_scheduler
-    restart: always
+    command: standalone
 
-    depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+# ==========================================================
+# 3. VOLUMES PERSISTANTS
+# ==========================================================
 
-    environment: *airflow_environment
-
-    volumes: *airflow_volumes
-
-    command: scheduler
-
-# Volumes persistants
 volumes:
   postgres_data:
+  airflow_state_data:

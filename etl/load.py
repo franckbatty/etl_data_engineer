@@ -1,43 +1,90 @@
-# Importation des modules
-import psycopg2  
+
+# ============================================================
+# IMPORTATION DES MODULES
+# ============================================================
+
+import psycopg2
 import configparser
 import yaml
+from pathlib import Path
+
+
 '''
-     - Le Module psycopg2 est un adaptateur PostgreSQL pour le langage de programmation Python. 
-     Il permet à Python de se connecter et d'interagir avec des bases de données PostgreSQL.
+- Le module psycopg2 est un adaptateur PostgreSQL pour Python.
+  Il permet à Python de se connecter et d'interagir avec une
+  base de données PostgreSQL.
 
-    - Le Module configparser est un module en Python utilisé pour manipuler des fichiers de configuration
-    au format INI. Il Facilite la gestion des paramètres de configuration d'une applications.
-    Il Permet de séparer les configurations du code, ce qui facilite la gestion et la maintenance.
+- Le module configparser permet de manipuler les fichiers de
+  configuration au format INI. Il facilite la séparation des
+  paramètres de configuration du code Python.
 
-    - Le Module yaml est un module en Python utilisé pour travailler avec des fichiers au format 
-    YAML (YAML Ain't Markup Language).
-    Il Permet de représenter des structures de données complexes de manière simple.
+- Le module yaml permet de lire et de manipuler les fichiers
+  au format YAML (YAML Ain't Markup Language). Il permet de
+  convertir les données YAML en structures Python.
+  
+- Le module pathlib permet de manipuler les chemins d'accès
+  aux fichiers de manière fiable, quel que soit le répertoire
+  depuis lequel le programme est exécuté.
 '''
 
-# Cette ligne ouvre le fichier config.yaml en mode lecture ('r').
-with open('../../config.yaml', 'r') as file:
-# Cette ligne charge le contenu du fichier YAML dans une variable Python nommée config_data.
-    config_data = yaml.safe_load(file) # La fonction safe_load () du module yaml lit le contenu 
-                                       # du fichier et le convertit en une structure de données Python
-                                       # (par exemple, un dictionnaire).
 
-''' Cette fonction nous permet de charger des données dans une base de données PostgreSQL en utilisant un 
-    DataFrame pandas, des commandes SQL, et des configurations stockées dans un fichier config.ini.
+# ============================================================
+# CHARGEMENT DU FICHIER DE CONFIGURATION YAML
+# ============================================================
 
-    create_PSQL: str : La commande SQL pour créer la table.
+# Récupération du chemin absolu du dossier racine du projet.
+# __file__ représente le chemin du fichier load.py.
+# parents[1] remonte de etl/ vers le dossier racine du projet.
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 
-    insert_PSQL: str : La commande SQL pour insérer les données.
+# Ouverture du fichier config.yaml en mode lecture.
+with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
 
-    -> object : Spécifie que la fonction retourne un objet.
+    # Lecture du contenu YAML et conversion en dictionnaire Python.
+    # safe_load() permet de charger les données YAML de manière sécurisée.
+    config_data = yaml.safe_load(file)
+
+
 '''
-def load_data(df: object, create_PSQL: str, insert_PSQL: str) -> object:
-    # Cette commande nous permet Crée un objet ConfigParser pour lire les fichiers de configuration.
-    config = configparser.ConfigParser()  
-    config.read('config.ini') # Permet de lire le fichier config.ini et charge les configurations.
-# Connexion à la base de données PostgreSQL
-    # psycopg2.connect : Établit une connexion à la base de données PostgreSQL en utilisant 
-    # les paramètres de configuration lus depuis config.ini.
+Cette fonction permet de charger les données d'un DataFrame
+Pandas dans une base de données PostgreSQL.
+
+Paramètres :
+    df : DataFrame contenant les données à charger.
+    create_PSQL : commande SQL permettant de créer la table.
+    insert_PSQL : commande SQL permettant d'insérer les données.
+
+Retour :
+    None : la fonction ne retourne pas de valeur.
+'''
+
+
+# ============================================================
+# FONCTION DE CHARGEMENT DES DONNÉES (LOAD)
+# ============================================================
+
+def load_data(df: object, create_PSQL: str, insert_PSQL: str) -> None:
+
+    # --------------------------------------------------------
+    # 1. LECTURE DU FICHIER DE CONFIGURATION INI
+    # --------------------------------------------------------
+
+    # Création d'un objet ConfigParser pour lire le fichier INI.
+    config = configparser.ConfigParser()
+
+    # Définition du chemin absolu du fichier config.ini.
+    CONFIG_INI_PATH = Path(__file__).resolve().parents[1] / "config.ini"
+
+    # Lecture des paramètres de connexion PostgreSQL.
+    config.read(CONFIG_INI_PATH, encoding='utf-8')
+
+
+    # --------------------------------------------------------
+    # 2. CONNEXION À LA BASE DE DONNÉES POSTGRESQL
+    # --------------------------------------------------------
+
+    # psycopg2.connect() établit une connexion à PostgreSQL
+    # à partir des paramètres contenus dans config.ini.
     conn = psycopg2.connect(
         host=config['POSTGRESQL']['host'],
         port=config['POSTGRESQL']['port'],
@@ -45,18 +92,41 @@ def load_data(df: object, create_PSQL: str, insert_PSQL: str) -> object:
         user=config['POSTGRESQL']['user'],
         password=config['POSTGRESQL']['password']
     )
-# Création d'un curseur et exécution de la commande CREATE TABLE
-    cursor = conn.cursor() # Crée un curseur pour exécuter les commandes SQL.
-    cursor.execute(create_PSQL) # Exécute la commande SQL pour créer la table.
-    conn.commit() # Valide (commit) la transaction de création de la table.
 
-# Insertion des données dans la table
-    for row in df.itertuples(index=False): # Itère sur chaque ligne du DataFrame sans inclure les index.
-        cursor.execute(insert_PSQL, row) # Exécute la commande d'insertion SQL pour chaque ligne du DataFrame,
-                                         # en passant les valeurs des colonnes comme arguments.
+    # --------------------------------------------------------
+    # 3. CRÉATION DU CURSEUR ET DE LA TABLE
+    # --------------------------------------------------------
 
-# Validation et fermeture des connexions.
-    conn.commit() # Valide (commit) toutes les transactions d'insertion.
-    cursor.close() # Ferme le curseur.
-    conn.close()   # Ferme la connexion à la base de données. 
-  
+    # Création d'un curseur pour exécuter les commandes SQL.
+    cursor = conn.cursor()
+
+    # Exécution de la commande SQL de création de la table.
+    cursor.execute(create_PSQL)
+
+    # Validation de la transaction de création de la table.
+    conn.commit()
+
+
+    # --------------------------------------------------------
+    # 4. INSERTION DES DONNÉES
+    # --------------------------------------------------------
+
+    # Parcours de chaque ligne du DataFrame sans récupérer l'index.
+    for row in df.itertuples(index=False):
+
+        # Insertion des valeurs de la ligne dans PostgreSQL.
+        cursor.execute(insert_PSQL, row)
+
+
+    # --------------------------------------------------------
+    # 5. VALIDATION ET FERMETURE DES RESSOURCES
+    # --------------------------------------------------------
+
+    # Validation de toutes les opérations d'insertion.
+    conn.commit()
+
+    # Fermeture du curseur.
+    cursor.close()
+
+    # Fermeture de la connexion à PostgreSQL.
+    conn.close()

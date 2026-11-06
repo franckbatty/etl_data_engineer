@@ -6,14 +6,12 @@ from datetime import (
     timedelta
 )
 # Importation de la fonction d'extration des données crées : extract_data 
-from etl_data_engineer.etl.extract import extract_data
-# Importation des fonctions de transformation des données crées
-from etl_data_engineer.etl.transform import (
+from etl.extract import extract_data
+from etl.transform import (
     transform_customers,
     transform_orders
 )
-# Importation de la fonction de chargement de données crées  
-from etl_data_engineer.etl.load import load_data
+from etl.load import load_data
 
 '''Cette ligne importe la classe DAG (Directed Acyclic Graph) d'Apache Airflow.
 qui vous permet de définir et de gérer des pipelines de données.'''
@@ -23,11 +21,11 @@ from airflow import DAG
 ''' Cette ligne importe la classe PythonOperator d'Apache Airflow.
 PythonOperator est utilisé pour définir des tâches qui exécutent des fonctions Python.'''
 
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python import PythonOperator
  
 # Ouverture du fichier YAML
 
-with open('../config.yaml', 'r') as file:
+with open('/opt/airflow/config.yaml', 'r') as file:
     config_data = yaml.safe_load(file)
 # yaml.safe_load(file) : Cette fonction du module yaml lit le contenu du fichier ouvert et le convertit
 # en une structure de données Python, telle qu'un dictionnaire.

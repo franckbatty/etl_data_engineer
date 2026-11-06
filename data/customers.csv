@@ -1,0 +1,9 @@
+customer_id,first_name,last_name,email,city,signup_date
+1,Amina,Mabiala,amina.mabiala@example.com,Brazzaville,2025-01-10
+2,Jean,Okemba,JEAN.OKEMBA@EXAMPLE.COM,Pointe-Noire,2025-02-14
+3,Chantal,Ngoma,chantal.ngoma@example.com,Dolisie,2025-03-01
+4,Patrick,Bokilo,patrick.bokilo@example.com,Brazzaville,2025-03-20
+5,Sarah,Mouanda,sarah.mouanda@example.com,Nkayi,2025-04-08
+6,Alain,Tchicaya,alain.tchicaya@example.com,Pointe-Noire,2025-05-12
+7,Merveille,Loufoua,merveille.loufoua@example.com,Ouesso,2025-06-02
+8,David,Bissiki,david.bissiki@example.com,Brazzaville,2025-06-19

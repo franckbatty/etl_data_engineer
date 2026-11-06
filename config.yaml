@@ -1,0 +1,90 @@
+# Fichier de Configuration principale 
+# Contenu du fichier de configuration du Pipeline
+
+pipeline:
+  name: Mon premier Pipeline # Le nom du pipeline de données.
+  version: 1.0  # La version du pipeline de données.
+
+# Paramètres de Connexion à la Base de Données PostgreSQL docker
+postgresql:
+  host: localhost # localhost signifie que la base de données est hébergée sur la même machine
+  port: 5433 # 5433 est le port d'eposition par PostgreSQL docker.
+  username: postgres # Le Nom d'utilisateur administrateur par défaut pour PostgreSQL.
+  password: etl_password # Le Mot de passe de l'utilisateur pour se connecter à la BDD
+  database_name: etl_dw # Le Nom de la base de données à laquelle vous voulez vous connecter.
+
+
+# Chemin des base de données CSV
+customers_filepath: data/customers.csv
+orders_filepath: data/orders.csv
+
+
+# Liste des Noms des Colonnes de la base de données 
+customers_columns_list: [ 'customer_id', 'first_name', 'last_name', 'email', 'city', 'signup_date']
+
+orders_columns_list: ['order_id', 'customer_id', 'order_date', 'product', 'quantity', 'unit_price', 'status']
+
+
+# Dictionnaire des Noms des Colonnes de la base de données modifiée
+customers_columns_rename_dict: {
+    "customer_id": "id_client",
+    "first_name": "prenom",
+    "last_name": "nom",
+    "email": "email",
+    "city": "ville",
+    "signup_date": "date_inscription"
+}
+
+orders_columns_rename_dict: {
+    "order_id": "id_commande",
+    "customer_id": "id_client",
+    "order_date": "date_commande",
+    "product": "produit",
+    "quantity": "quantite",
+    "unit_price": "prix_unitaire",
+    "status": "statut"
+}
+                              
+# Les Base de données sauvergardées dans la table PostgreSQL docker (PSQL)
+
+# Cette ligne spécifie le nom de la table PostgreSQL (PSQL) où 
+# les données seront stockées.
+# etl_dw.customers est le nom de la table PostgreSQL où 
+
+#  customers_table_PSQL : Spécifie la table PostgreSQL où les données des accidents de circulation seront stockées.
+#   Le préfixe customers_table_ indique clairement que cette clé est liée à la table des accidents.
+
+customers_table_PSQL: etl_dw.customers
+orders_table_PSQL: etl_dw.orders
+
+  
+# Chicago Data output schemas in PSQL
+customers_create_PSQL: '''CREATE TABLE IF NOT EXISTS etl_dw.customers
+                      (id_client INTEGER PRIMARY KEY,
+                        prenom VARCHAR(100),
+                        nom VARCHAR(100),
+                        email VARCHAR(255),
+                        ville VARCHAR(100),
+                        date_inscription DATE)'''
+customers_insert_PSQL: 'INSERT INTO etl_dw.customers VALUES (%s, %s, %s, %s, %s, %s)'
+
+# customers_insert_PSQL : Cette commande SQL est utilisée pour insérer des valeurs dans la table customers du schéma etl_dw.
+# Les symboles %s sont des espaces réservés (placeholders) pour les valeurs qui seront insérées dans 
+#chaque colonne.
+ 
+orders_create_PSQL: '''CREATE TABLE IF NOT EXISTS etl_dw.orders
+                    (
+                        id_commande INTEGER PRIMARY KEY,
+                        id_client INTEGER,
+                        date_commande DATE,
+                        produit VARCHAR(150),
+                        quantite INTEGER,
+                        prix_unitaire NUMERIC(12, 2),
+                        status VARCHAR(50),
+
+                        CONSTRAINT fk_orders_customers
+                            FOREIGN KEY (id_client)
+                            REFERENCES etl_dw.customers(id_client)
+                    )'''
+orders_insert_PSQL: 'INSERT INTO etl_dw.orders VALUES (%s, %s, %s, %s, %s, %s, %s)'
+

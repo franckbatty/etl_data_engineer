@@ -1,0 +1,14 @@
+
+# Bibliothèques nécessaires au projet ETL
+
+# Manipulation et transformation des données
+pandas
+
+# Connexion à PostgreSQL
+psycopg2-binary
+
+# Lecture des fichiers de configuration
+PyYAML
+
+# Lecture des fichiers config.ini
+# ConfigParser est intégré à Python, aucune installation nécessaire.

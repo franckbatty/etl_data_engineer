@@ -34,7 +34,7 @@ with open('/opt/airflow/config.yaml', 'r') as file:
 # ============================================================
 
 default_args = {
-    'owner': 'Mon pipeline airflow',
+    'owner': 'Franck BATTY',
     'depends_on_past': False,
     'start_date': datetime(2026, 11, 6),
     'retry_delay': timedelta(minutes=5),

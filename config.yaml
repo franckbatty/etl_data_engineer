@@ -60,6 +60,7 @@ orders_columns_list:
 
 # Correspondance entre les noms des colonnes sources
 # et les noms retenus dans notre base de données.
+
 customers_columns_rename_dict:
   customer_id: id_client
   first_name: prenom
@@ -96,8 +97,18 @@ schema_create_PSQL: |
   CREATE SCHEMA IF NOT EXISTS etl_dw;
 
 
-# Création de la table des clients.
-# id_client est la clé primaire : chaque client doit avoir un identifiant unique.
+# ------------------------------------------------------------
+# CRÉATION DE LA TABLE CUSTOMERS
+# ------------------------------------------------------------
+
+# id_client : clé primaire permettant d'identifier chaque client.
+#
+# created_at : date et heure de création de l'enregistrement.
+# updated_at : date et heure de la dernière modification.
+#
+# CURRENT_TIMESTAMP renseigne automatiquement la date et l'heure
+# lors de l'insertion d'un nouvel enregistrement.
+
 customers_create_PSQL: |
   CREATE TABLE IF NOT EXISTS etl_dw.customers (
     id_client INTEGER PRIMARY KEY,
@@ -105,13 +116,23 @@ customers_create_PSQL: |
     nom VARCHAR(100),
     email VARCHAR(255),
     ville VARCHAR(100),
-    date_inscription DATE
+    date_inscription DATE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
 
-# Création de la table des commandes.
-# id_commande est la clé primaire.
-# id_client est une clé étrangère qui référence la table customers.
+# ------------------------------------------------------------
+# CRÉATION DE LA TABLE ORDERS
+# ------------------------------------------------------------
+
+# id_commande : clé primaire de la table.
+# id_client : clé étrangère qui référence la table customers.
+#
+# created_at : date et heure de création de la commande.
+# updated_at : date et heure de la dernière modification.
+
 orders_create_PSQL: |
   CREATE TABLE IF NOT EXISTS etl_dw.orders (
     id_commande INTEGER PRIMARY KEY,
@@ -122,6 +143,9 @@ orders_create_PSQL: |
     prix_unitaire NUMERIC(12, 2),
     statut VARCHAR(50),
 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     CONSTRAINT fk_orders_customers
       FOREIGN KEY (id_client)
       REFERENCES etl_dw.customers(id_client)
@@ -129,18 +153,85 @@ orders_create_PSQL: |
 
 
 # ============================================================
+# FONCTION SQL D'AUTOMATISATION DE UPDATED_AT
+# ============================================================
+
+# Cette fonction est appelée par les triggers.
+#
+# À chaque modification d'un enregistrement, elle actualisé
+# automatiquement updated_at avec la date et l'heure courantes.
+#
+# NEW représente la nouvelle version de la ligne modifiée.
+
+update_updated_at_function: |
+  CREATE OR REPLACE FUNCTION etl_dw.update_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+
+# ============================================================
+# TRIGGER DE MISE À JOUR AUTOMATIQUE : CUSTOMERS
+# ============================================================
+
+# DROP TRIGGER IF EXISTS :
+# Supprime l'ancien trigger s'il existe déjà.
+# Cela permet de relancer le script sans erreur de duplication.
+#
+# BEFORE UPDATE :
+# Exécute le trigger avant chaque modification d'un client.
+#
+# FOR EACH ROW :
+# Le trigger s'applique à chaque ligne modifiée.
+
+customers_updated_at_trigger: |
+  DROP TRIGGER IF EXISTS trg_customers_updated_at
+  ON etl_dw.customers;
+
+  CREATE TRIGGER trg_customers_updated_at
+  BEFORE UPDATE ON etl_dw.customers
+  FOR EACH ROW
+  EXECUTE FUNCTION etl_dw.update_updated_at();
+
+
+# ============================================================
+# TRIGGER DE MISE À JOUR AUTOMATIQUE : ORDERS
+# ============================================================
+
+# Ce trigger applique le même mécanisme à la table des commandes.
+# À chaque modification d'une commande, updated_at est actualisé.
+
+orders_updated_at_trigger: |
+  DROP TRIGGER IF EXISTS trg_orders_updated_at
+  ON etl_dw.orders;
+
+  CREATE TRIGGER trg_orders_updated_at
+  BEFORE UPDATE ON etl_dw.orders
+  FOR EACH ROW
+  EXECUTE FUNCTION etl_dw.update_updated_at();
+
+
+# ============================================================
 # COMMANDES SQL D'INSERTION ET DE MISE À JOUR DES DONNÉES
 # ============================================================
 
+
+# ------------------------------------------------------------
 # INSERTION DES CLIENTS
-#
+# ------------------------------------------------------------
+
 # ON CONFLICT (id_client) :
-# Si un client possède déjà cet identifiant, PostgreSQL ne génère
-# pas d'erreur de doublon.
+# Si un client possède déjà cet identifiant, PostgreSQL
+# ne génère pas d'erreur de doublon.
 #
 # DO UPDATE :
-# Les informations du client existant sont actualisées avec
-# les nouvelles valeurs provenant du fichier CSV.
+# Les informations du client existant sont actualisées.
+#
+# Le trigger actualise automatiquement updated_at.
+# created_at conserve sa valeur initiale.
 
 customers_insert_PSQL: |
   INSERT INTO etl_dw.customers
@@ -155,23 +246,28 @@ customers_insert_PSQL: |
     date_inscription = EXCLUDED.date_inscription;
 
 
+# ------------------------------------------------------------
 # INSERTION DES COMMANDES
-#
+# ------------------------------------------------------------
+
 # ON CONFLICT (id_commande) :
 # Si la commande existe déjà, PostgreSQL actualise ses informations.
 #
-# Cela permet de relancer le chargement sans provoquer une erreur
-# de clé primaire en cas de données déjà présentes.
+# Le trigger actualise automatiquement updated_at en cas de
+# modification d'une commande existante.
+#
+# created_at conserve sa valeur initiale.
 
 orders_insert_PSQL: |
   INSERT INTO etl_dw.orders
-  (id_commande, id_client, date_commande, produit, quantite, prix_unitaire, statut)
+  (id_commande, id_client, date_commande, produit, quantite,
+   prix_unitaire, statut)
   VALUES (%s, %s, %s, %s, %s, %s, %s)
   ON CONFLICT (id_commande)
   DO UPDATE SET
     id_client = EXCLUDED.id_client,
     date_commande = EXCLUDED.date_commande,
     produit = EXCLUDED.produit,
-    quantite = EXCLUDED.quantite,
+    quantite = EXCLUDED.quantite, 
     prix_unitaire = EXCLUDED.prix_unitaire,
     statut = EXCLUDED.statut;

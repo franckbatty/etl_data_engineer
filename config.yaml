@@ -243,7 +243,8 @@ customers_insert_PSQL: |
     nom = EXCLUDED.nom,
     email = EXCLUDED.email,
     ville = EXCLUDED.ville,
-    date_inscription = EXCLUDED.date_inscription;
+    date_inscription = EXCLUDED.date_inscription,
+    updated_at = CURRENT_TIMESTAMP; 
 
 
 # ------------------------------------------------------------
@@ -268,6 +269,7 @@ orders_insert_PSQL: |
     id_client = EXCLUDED.id_client,
     date_commande = EXCLUDED.date_commande,
     produit = EXCLUDED.produit,
-    quantite = EXCLUDED.quantite, 
+    quantite = EXCLUDED.quantite,
     prix_unitaire = EXCLUDED.prix_unitaire,
-    statut = EXCLUDED.statut;
+    statut = EXCLUDED.statut,
+    updated_at = CURRENT_TIMESTAMP; 
